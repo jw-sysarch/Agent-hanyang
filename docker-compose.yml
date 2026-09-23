@@ -1,0 +1,235 @@
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: hanyang-study-front
+    environment:
+      VITE_ADK_API_BASE_URL: /api
+      VITE_ADK_APP_NAME: root_agent
+      VITE_ADK_PROXY_TARGET: http://adk-agent:8000
+    ports:
+      - "4200:4200"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      adk-agent:
+        condition: service_started
+
+  adk-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: google-adk-agent
+    env_file:
+      - path: ./.env
+        required: true
+    environment:
+      APP_NAME: root_agent
+      ADK_SERVER_MODE: ${ADK_SERVER_MODE:-api}
+      OLLAMA_API_BASE: ${OLLAMA_API_BASE:-http://host.docker.internal:11434}
+      GMAIL_MCP_URL: http://mcp-gmail:8008
+      GOOGLE_DOCS_MCP_URL: http://mcp-google-docs:8001
+      GOOGLE_SHEETS_MCP_URL: http://mcp-google-sheets:8003
+      GOOGLE_CALENDAR_MCP_URL: http://mcp-google-calendar:8002
+      EVERYTIME_MCP_URL: http://mcp-everytime:8004
+      NAVER_CLOVA_MCP_URL: http://mcp-naver-clova:8005
+      KAKAO_MAP_MCP_URL: http://mcp-kakao-map:8006
+    ports:
+      - "${PORT:-8000}:${PORT:-8000}"
+    volumes:
+      - ./data:/data
+      - .:/app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      mcp-gmail:
+        condition: service_started
+      mcp-google-docs:
+        condition: service_started
+      mcp-google-sheets:
+        condition: service_started
+      mcp-google-calendar:
+        condition: service_started
+      mcp-everytime:
+        condition: service_started
+      mcp-naver-clova:
+        condition: service_started
+      mcp-kakao-map:
+        condition: service_started
+
+  adk-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: google-adk-web
+    profiles: ["web"]
+    env_file:
+      - path: ./.env
+        required: true
+    environment:
+      ADK_SERVER_MODE: web
+      APP_NAME: root_agent
+      HOST: 0.0.0.0
+      PORT: ${PORT:-8000}
+      AGENTS_DIR: agents
+      ALLOW_ORIGINS: ${ALLOW_ORIGINS:-http://localhost:4200,http://127.0.0.1:4200}
+      OLLAMA_API_BASE: ${OLLAMA_API_BASE:-http://host.docker.internal:11434}
+      GMAIL_MCP_URL: http://mcp-gmail:8008
+      GOOGLE_DOCS_MCP_URL: http://mcp-google-docs:8001
+      GOOGLE_SHEETS_MCP_URL: http://mcp-google-sheets:8003
+      GOOGLE_CALENDAR_MCP_URL: http://mcp-google-calendar:8002
+      EVERYTIME_MCP_URL: http://mcp-everytime:8004
+      NAVER_CLOVA_MCP_URL: http://mcp-naver-clova:8005
+      KAKAO_MAP_MCP_URL: http://mcp-kakao-map:8006
+    ports:
+      - "${PORT:-8000}:${PORT:-8000}"
+    volumes:
+      - ./data:/data
+      - .:/app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      mcp-gmail:
+        condition: service_started
+      mcp-google-docs:
+        condition: service_started
+      mcp-google-sheets:
+        condition: service_started
+      mcp-google-calendar:
+        condition: service_started
+      mcp-everytime:
+        condition: service_started
+      mcp-naver-clova:
+        condition: service_started
+      mcp-kakao-map:
+        condition: service_started
+
+  mcp-gmail:
+    build:
+      context: .
+      dockerfile: mcps/gmail/Dockerfile
+    container_name: mcp-gmail
+    env_file:
+      - path: ./mcps/gmail/.env.gmail
+        required: true
+    environment:
+      MCP_NAME: gmail
+      PORT: 8008
+    ports:
+      - "8008:8008"
+    volumes:
+      - ./mcps/gmail:/app
+
+  mcp-google-docs:
+    build:
+      context: .
+      dockerfile: mcps/google_docs/Dockerfile
+    container_name: mcp-google-docs
+    env_file:
+      - path: ./mcps/google_docs/.env.google_docs
+        required: true
+    environment:
+      MCP_NAME: google_docs
+      PORT: 8001
+    ports:
+      - "8001:8001"
+      - "8080:8080"
+    volumes:
+      - ./mcps/google_docs:/app
+
+  mcp-google-sheets:
+    build:
+      context: .
+      dockerfile: mcps/google_sheets/Dockerfile
+    container_name: mcp-google-sheets
+    env_file:
+      - path: ./mcps/google_sheets/.env.google_sheets.example
+        required: true
+      - path: ./mcps/google_sheets/.env.google_sheets
+        required: false
+    environment:
+      MCP_NAME: google_sheets
+      PORT: 8003
+    ports:
+      - "8003:8003"
+    volumes:
+      - ./mcps/google_sheets:/app
+
+  mcp-google-calendar:
+    build:
+      context: .
+      dockerfile: mcps/google_calendar/Dockerfile
+    container_name: mcp-google-calendar
+    env_file:
+      - path: ./mcps/google_calendar/.env.google_calendar
+        required: true
+    environment:
+      MCP_NAME: google_calendar
+      PORT: 8002
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./mcps/google_calendar:/app
+
+  mcp-everytime:
+    build:
+      context: .
+      dockerfile: mcps/everytime/Dockerfile
+    container_name: mcp-everytime
+    env_file:
+      - path: ./mcps/everytime/.env.everytime
+        required: true
+    environment:
+      MCP_NAME: everytime
+      PORT: 8004
+    ports:
+      - "8004:8004"
+    volumes:
+      - ./mcps/everytime:/app
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/healthz', timeout=5).read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  mcp-naver-clova:
+    build:
+      context: .
+      dockerfile: mcps/naver_clova/Dockerfile
+    container_name: mcp-naver-clova
+    env_file:
+      - path: ./mcps/naver_clova/.env.naver_clova.example
+        required: true
+      - path: ./mcps/naver_clova/.env.naver_clova
+        required: false
+    environment:
+      MCP_NAME: naver_clova
+      PORT: 8005
+    ports:
+      - "8005:8005"
+    volumes:
+      - ./mcps/naver_clova:/app
+      - ${NAVER_CLOVA_AUDIO_DIR:-./data/audio}:/audio
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8005/health', timeout=5).read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  mcp-kakao-map:
+    build:
+      context: .
+      dockerfile: mcps/kakao_map/Dockerfile
+    container_name: mcp-kakao-map
+    env_file:
+      - path: ./mcps/kakao_map/.env.kakao_map
+        required: true
+    environment:
+      MCP_NAME: kakao_map
+      PORT: 8006
+    ports:
+      - "8006:8006"
+    volumes:
+      - ./mcps/kakao_map:/app

@@ -1,0 +1,2 @@
+class EverytimeRequestError(RuntimeError):
+    pass

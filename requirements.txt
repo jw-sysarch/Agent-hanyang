@@ -1,0 +1,6 @@
+google-adk
+mcp
+litellm
+python-dotenv
+uvicorn
+fastapi
